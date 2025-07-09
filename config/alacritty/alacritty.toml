@@ -1,0 +1,24 @@
+# Themes can be found at: https://github.com/alacritty/alacritty-theme
+import = [
+    # "~/.config/alacritty/themes/github_dark_dimmed.toml"
+    # "~/.config/alacritty/themes/material_theme.toml",
+    # "~/.config/alacritty/themes/ayu_light.toml",
+    # "~/.config/alacritty/themes/ayu_dark.toml",
+    "~/.config/alacritty/themes/ayu_mirage.toml",
+    # "~/.config/alacritty/themes/catppuccin_mocha.toml",
+]
+
+[env]
+TERM = "xterm-256color"
+
+[font]
+size = 10
+
+[font.normal]
+# family = "MonaspiceNeNerdFont"
+family = "ComicCode"
+style = "Regular"
+
+
+[window.padding]
+x = 5

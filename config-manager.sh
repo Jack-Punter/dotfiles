@@ -1,192 +1,94 @@
 #!/bin/bash
 
-# Generic shell script for managing snippet installation in ~/.bashrc
-# This script can install/remove any snippet by name
+# config-manager.sh
+# Manage installation/removal of config folders from ./config/ to ~/.config/
 
-# Helper function to generate markers for a snippet
-generate_markers() {
-    local snippet_name="$1"
-    begin_marker="# BEGIN $snippet_name snippet"
-    end_marker="# END $snippet_name snippet"
+CONFIG_SRC_DIR="config"
+CONFIG_DEST_DIR="$HOME/.config"
+
+# Helper: List all config folders in $CONFIG_SRC_DIR
+list_configs() {
+    find "$CONFIG_SRC_DIR" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null
 }
 
-# Helper function to extract snippet name from file path
-extract_snippet_name() {
-    local snippet_file="$1"
-    local snippet_name="${snippet_file##*/}"
-    echo "${snippet_name%.snippet.sh}"
+# Install a single config folder
+install_config() {
+    local config_name="$1"
+    local src="$CONFIG_SRC_DIR/$config_name"
+    local dest="$CONFIG_DEST_DIR/$config_name"
+
+    if [[ ! -d "$src" ]]; then
+        echo "Error: '$src' does not exist."
+        return 1
+    fi
+
+    if [[ -e "$dest" ]]; then
+        echo "Config '$config_name' already exists in ~/.config/"
+        return 0
+    fi
+
+    cp -r "$src" "$dest"
+    echo "Installed '$config_name'"
 }
 
-# Helper function to check if a snippet is installed
-is_snippet_installed() {
-    local snippet_name="$1"
-    generate_markers "$snippet_name"
-    grep -q "$begin_marker" ~/.bashrc
+# Remove a single config folder
+remove_config() {
+    local config_name="$1"
+    local dest="$CONFIG_DEST_DIR/$config_name"
+
+    if [[ ! -e "$dest" ]]; then
+        echo "Config '$config_name' not found in ~/.config/"
+        return 1
+    fi
+
+    rm -rf "$dest"
+    echo "Removed '$config_name' from ~/.config/"
 }
 
-# Helper function to iterate through all snippet files
-iterate_snippets() {
-    local callback_function="$1"
-    
-    # Find all .snippet.sh files in bash-snippets folder
-    for snippet_file in bash-snippets/*.snippet.sh; do
-        # Check if glob didn't match any files
-        if [[ ! -f "$snippet_file" ]]; then
-            echo "No .snippet.sh files found in bash-snippets directory"
-            return 1
-        fi
-        
-        local snippet_name
-        snippet_name=$(extract_snippet_name "$snippet_file")
-        
-        # Call the callback function with the snippet name
-        $callback_function "$snippet_name"
-    done
-}
-
-# Batch functions for all snippets
+# Install all configs
 install_all() {
-    local installed_count=0
-    local already_installed_count=0
-    
-    # Callback function for each snippet
-    process_install() {
-        local snippet_name="$1"
-        
-        if ! is_snippet_installed "$snippet_name"; then
-            install_snippet "$snippet_name"
-            ((installed_count++))
-        else
-            echo "$snippet_name snippet already installed"
-            ((already_installed_count++))
-        fi
-    }
-    
-    iterate_snippets process_install
-    echo "Summary: $installed_count installed, $already_installed_count already installed"
+    local count=0
+    for config in $(list_configs); do
+        install_config "$config" && ((count++))
+    done
+    echo "Installed $count config(s)."
 }
 
+# Remove all configs
 remove_all() {
-    local removed_count=0
-    local not_found_count=0
+    local count=0
+    for config in $(list_configs); do
+        remove_config "$config" && ((count++))
+    done
     
-    # Callback function for each snippet
-    process_remove() {
-        local snippet_name="$1"
-        
-        if is_snippet_installed "$snippet_name"; then
-            remove_snippet "$snippet_name"
-            ((removed_count++))
-        else
-            echo "$snippet_name snippet not found in ~/.bashrc"
-            ((not_found_count++))
-        fi
-    }
-    
-    iterate_snippets process_remove
-    echo "Summary: $removed_count removed, $not_found_count not found"
+    echo "Removed $count config(s)."
 }
 
-# List all available snippets and their installation status
-list() {
-    echo "Available snippets in bash-snippets/:"
-    echo "======================================"
-    
-    # Callback function for each snippet
-    process_list() {
-        local snippet_name="$1"
-        
-        if is_snippet_installed "$snippet_name"; then
-            echo "  ✔ $snippet_name"
+# List configs and their status
+list_status() {
+    printf "Configs in '%s':\n" "$CONFIG_SRC_DIR"
+    printf "====================\n"
+    for config in $(list_configs); do
+        if [[ -e "$CONFIG_DEST_DIR/$config" ]]; then
+            echo "  ✔ $config"
         else
-            echo "  ✘ $snippet_name"
+            echo "  ✘ $config"
         fi
-    }
-    
-    iterate_snippets process_list
-    
+    done
     echo ""
-    echo "Use 'install-snippet <name>' to install a specific snippet"
-    echo "Use 'install-all' to install all snippets"
+    echo "Use '$0 install <name>' or '$0 remove <name>' for individual configs."
 }
 
-# Generic functions (for comparison with original functions above)
-install_snippet() {
-    local snippet_name="$1"
-    
-    if [[ -z "$snippet_name" ]]; then
-        echo "Error: snippet name is required"
-        return 1
-    fi
-    
-    # Construct filename from snippet name (look in bash-snippets folder)
-    local snippet_file="bash-snippets/${snippet_name}.snippet.sh"
-    
-    if [[ ! -f "$snippet_file" ]]; then
-        echo "Error: snippet file '$snippet_file' not found"
-        return 1
-    fi
-    
-    # Generate markers based on snippet name
-    generate_markers "$snippet_name"
-    
-    if ! grep -q "$begin_marker" ~/.bashrc; then
-        # Add the snippet with markers
-        echo ""                >> ~/.bashrc
-        echo "$begin_marker"   >> ~/.bashrc
-        cat "$snippet_file"    >> ~/.bashrc
-        echo "$end_marker"     >> ~/.bashrc
-
-        echo "$snippet_name snippet installed to ~/.bashrc"
-    else
-        echo "$snippet_name snippet already installed"
-    fi
-}
-
-remove_snippet() {
-    local snippet_name="$1"
-    
-    if [[ -z "$snippet_name" ]]; then
-        echo "Error: snippet name is required"
-        return 1
-    fi
-    
-    # Generate markers based on snippet name
-    generate_markers "$snippet_name"
-    
-    if grep -q "$begin_marker" ~/.bashrc; then
-        # Use sed to delete all lines between (and including) the markers
-        # -i flag: edit file in-place
-        # '/pattern1/,/pattern2/d': delete lines from pattern1 to pattern2 (inclusive)
-        sed -i "/$begin_marker/,/$end_marker/d" ~/.bashrc
-        echo "$snippet_name snippet removed from ~/.bashrc"
-    else
-        echo "$snippet_name snippet not found in ~/.bashrc"
-    fi
-}
-
-# Function to show usage information
 usage() {
-    echo "Usage: $0 {install-all|remove-all|install-snippet|remove-snippet|list}"
-    echo "  install-all                      - Install ALL .snippet.sh files from bash-snippets/ (batch operation)"
-    echo "  remove-all                       - Remove ALL .snippet.sh files from bash-snippets/ (batch operation)"
-    echo "  install-snippet <name>           - Install specific snippet by name (generic function)"
-    echo "  remove-snippet <name>            - Remove specific snippet by name (generic function)"
-    echo "  list                             - List all available snippets and their installation status"
-    echo ""
-    echo "Generic functions expect files named: bash-snippets/<name>.snippet.sh"
-    echo ""
-    echo "Examples:"
-    echo "  $0 list                          # Shows all snippets with ✔/✘ status"
-    echo "  $0 install-all                   # Installs all bash-snippets/*.snippet.sh files"
-    echo "  $0 remove-all                    # Removes all bash-snippets/*.snippet.sh files"
-    echo "  $0 install-snippet \"git-prompt\"  # Installs bash-snippets/git-prompt.snippet.sh"
-    echo "  $0 remove-snippet \"my-aliases\"   # Removes my-aliases snippet from ~/.bashrc"
+    echo "Usage: $0 {install-all|remove-all|install <name>|remove <name>|list}"
+    echo "  install-all         - Install all config folders to ~/.config/"
+    echo "  remove-all          - Remove all config folders from ~/.config/"
+    echo "  install <name>      - Install a specific config folder"
+    echo "  remove <name>       - Remove a specific config folder"
+    echo "  list                - List all config folders and their status"
     exit 1
 }
 
-# Main script logic
-get_current_shell
 case "$1" in
     install-all)
         install_all
@@ -194,14 +96,14 @@ case "$1" in
     remove-all)
         remove_all
         ;;
-    install-snippet)
-        install_snippet "$2"
+    install)
+        install_config "$2"
         ;;
-    remove-snippet)
-        remove_snippet "$2"
+    remove)
+        remove_config "$2"
         ;;
     list)
-        list
+        list_status
         ;;
     *)
         usage
