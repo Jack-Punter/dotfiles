@@ -39,7 +39,7 @@ RESET='\[\033[00m\]'
 
 # Function to set PS1 with customizable user@hostname color
 set_git_prompt() {
-    local user_color="${1:-$GREEN}"  # Default to GREEN if not specified
+    local user_color="${1:-$BRIGHT_GREEN}"  # Default to GREEN if not specified
 
     PS1='${debian_chroot:+($debian_chroot)}'      # Show chroot if present
     PS1+="${user_color}\u@\h${RESET}:"            # user@hostname with custom color
